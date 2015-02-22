@@ -1,0 +1,163 @@
+---
+title: "Machine Learning Prediction project"
+author: "Sam G"
+date: "Feb 22, 2015"
+output: html_document
+---
+
+---
+output: pdf_document
+---
+#
+
+##Introduction:
+
+As part of **Coursera Machine Learning Course** this Prediction Assignment uses data from a personal activity monitoring device(Fitbit, Nike Fuelband, or Jawbone Up), to predict the manner in which participants did the exercise.
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement – a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+###Synopsis:
+
+The goal of this project is to predict the manner in which the participants did the exercise. This is the "classe" variable in the training set. And may use any of the other variables to predict with.
+
+### Data:
+
+The training data for this project are available here: 
+
+"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+
+The test data are available here: 
+
+"https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+### Setting up the environment and downloading file
+
+```{r}
+setwd ("~/scientist/maclearn")
+
+#download.file('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv', method= 'curl', 'pml-training.csv') 
+
+#download.file('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv', method= 'curl', 'pml-testing.csv') 
+
+library(ggplot2)
+library(lattice)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(corrplot)
+library(randomForest)
+```
+
+### Reading the `Training` and `Testing` Data:
+
+
+```{r}
+
+traindata <- read.csv('~/scientist/maclearn/pml-training.csv')
+testdata <- read.csv('~/scientist/maclearn/pml-testing.csv')
+dim(traindata) # Getting the dimension 
+dim(testdata) # Getting the dimension 
+```
+
+As we can see the training data set has 19622 observations and 160 variables whereas testing data set contains 20 observations and 160 variables. The "classe" variable in the training set is the outcome to predict. 
+
+### Filtering the data:
+
+Removing the missing values - NA and unnecessary variables,info etc.
+
+```{r}
+
+traindata <- traindata[, colSums(is.na(traindata)) == 0] 
+testdata <- testdata[, colSums(is.na(testdata)) == 0] 
+
+sum(complete.cases(traindata))
+sum(complete.cases(testdata))
+
+classe <- traindata$classe
+trainfilter <- grepl("^X|timestamp|window", names(traindata))
+traindata <- traindata[, !trainfilter]
+traingood <- traindata[, sapply(traindata, is.numeric)]
+traingood$classe <- classe
+testfilter <- grepl("^X|timestamp|window", names(testdata))
+testdata <- testdata[, !testfilter]
+testgood <- testdata[, sapply(testdata, is.numeric)]
+
+```
+
+```{r}
+dim(testgood)
+dim(traingood)
+```
+
+We can see the filtered data has 19622 observations and 53 vairables whereas testing data set has 20 observations and 53 vaiables. The `classe` variable is part of this filtered data.
+
+### Segregating the Data:
+
+At this stage we'll segregate the filtered data into only training data set which will be 80% and a validatition set as 20%. The validatition set will be used for a check on our assumptions and inferences.
+
+```{r}
+set.seed(22519) 
+Justtrain <- createDataPartition(traingood$classe, p=0.80, list=F) #data splitting function of "caret"
+Trfinal <- traingood[Justtrain, ]
+Tefinal <- traingood[-Justtrain, ]
+
+```
+
+
+### Algorithm for Predictive Data Model:
+
+The algorihm we'll be suing will have to fit our prective analysis. For this we'll be using `Random Forest` algorithm as they are an ensemble learning method for classification, regression and other tasks, that operate by constructing a multitude of decision trees at training time and outputting the class that is the mode of the classes (classification) or mean prediction (regression) of the individual trees. Random forests correct for decision trees' habit of overfitting to their training set.
+
+```{r}
+RanForStage <- trainControl(method="cv", 5) #trainControl to control the computational nuances of the train function 
+#5 fold cross validation is used here "http://en.wikipedia.org/wiki/Cross-validation_%28statistics%29"
+
+RanForMod <- train(classe ~ ., data=Trfinal, method="rf", trControl=RanForStage, ntree=250)
+RanForMod
+
+```
+
+Once we have the Random Forest function performing sampling and processing, we'll estimate the preformance of the model.
+
+```{r}
+RanForPred <- predict(RanForMod, Trfinal)
+confusionMatrix(Trfinal$classe, RanForPred)
+
+```
+
+Now we test the accuracy of our predition.
+
+```{r}
+
+Acurcy <- postResample(RanForPred, Trfinal$classe)
+Acurcy
+```
+
+
+```{r}
+SpleErr <- 1 - as.numeric(confusionMatrix(Trfinal$classe, RanForPred)$overall[1])
+SpleErr #Getting Sample error
+
+```
+
+
+We see the estimated accuracy of the model is 100% and the sample error is 0%.
+
+### Final Prediction of the Test Data Set:
+
+```{r}
+
+TestResult <- predict(RanForMod, testgood[, -length(names(testgood))])
+TestResult
+
+```
+
+### Appendix:
+
+#### Model of the Prediction Tree.
+```{r}
+ModTree <- rpart(classe ~ ., data=Trfinal, method="class")
+prp(ModTree)
+
+```
+
