@@ -2,7 +2,7 @@
 title: "Machine Learning Prediction project"
 author: "Sam G"
 date: "Feb 22, 2015"
-output: html_document
+output: pdf_document
 ---
 
 ---
